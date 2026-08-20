@@ -1,0 +1,27 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Hand Event logs and local states (dynamic solve data)
+hand_events.json
+session_state.json
+
+# Local telemetry outputs
+results.json
+public/assets/results.json
+
+# IDE Configs
+.idea/
+.vscode/
+
+# Large media files
+*.mp4
+*.avi
+*.mov

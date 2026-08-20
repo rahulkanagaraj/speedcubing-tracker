@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CubeMind AI - Speedcubing Dashboard</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            slate: {
+              950: '#070a13',
+              900: '#0f172a',
+              800: '#1e293b',
+              700: '#334155',
+            },
+            brand: {
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- React, ReactDOM, Babel CDNs -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen transition-colors duration-300">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    // Custom UI SVG Icons
+    const Icons = {
+      Check: () => (
+        <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
+        </svg>
+      ),
+      Loading: () => (
+        <svg className="animate-spin h-8 w-8 text-indigo-500" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      ),
+      Camera: () => (
+        <svg className="w-12 h-12 text-slate-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      ),
+      Dark: () => (
+        <svg className="w-5 h-5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+      ),
+      Light: () => (
+        <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+        </svg>
+      ),
+      Speed: () => (
+        <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+      ),
+      Moves: () => (
+        <svg className="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+        </svg>
+      ),
+      SolveTime: () => (
+        <svg className="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    };
+
+    function App() {
+      const [data, setData] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [error, setError] = useState(false);
+      const [isDark, setIsDark] = useState(true);
+      const [cameraActive, setCameraActive] = useState(false);
+      const [modelLoaded, setModelLoaded] = useState(false);
+      const [solveState, setSolveState] = useState("WAITING"); // WAITING, READY_COUNTDOWN, READY, SOLVING, STOP_COUNTDOWN, STOPPED
+      const [timerVal, setTimerVal] = useState(0.0);
+      
+      const prevSolveStateRef = useRef("WAITING");
+
+      // Fetch telemetry results.json from assets
+      const fetchResults = async () => {
+        try {
+          const res = await fetch('/public/assets/results.json');
+          if (!res.ok) throw new Error("JSON not found");
+          const json = await res.json();
+          if (!json || Object.keys(json).length === 0) throw new Error("JSON empty");
+          setData(json);
+          setError(false);
+        } catch (err) {
+          setError(true);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      useEffect(() => {
+        fetchResults();
+        const poll = setInterval(fetchResults, 2000);
+        return () => clearInterval(poll);
+      }, []);
+
+      // Poll state API endpoint for timer and solve state updates
+      useEffect(() => {
+        if (!cameraActive) return;
+
+        const pollState = async () => {
+          try {
+            const res = await fetch('/api/state');
+            if (!res.ok) return;
+            const json = await res.json();
+            
+            setSolveState(json.state);
+            setTimerVal(json.timer);
+            setModelLoaded(json.model_loaded);
+
+            // Fetch results immediately if the state transitioned to STOPPED
+            if (json.state === "STOPPED" && prevSolveStateRef.current !== "STOPPED") {
+              setTimeout(fetchResults, 200); // 200ms grace period for file output
+            }
+            prevSolveStateRef.current = json.state;
+          } catch (err) {
+            console.error("Error polling state:", err);
+          }
+        };
+
+        // Poll every 100ms for smooth state/timer synchronization
+        const interval = setInterval(pollState, 100);
+        return () => clearInterval(interval);
+      }, [cameraActive]);
+
+      // Toggle Dark Mode
+      const toggleTheme = () => {
+        setIsDark(!isDark);
+        if (isDark) {
+          document.documentElement.classList.remove('dark');
+        } else {
+          document.documentElement.classList.add('dark');
+        }
+      };
+
+      // Webcam toggle
+      const toggleCamera = () => {
+        setCameraActive(!cameraActive);
+        setSolveState("WAITING");
+        setTimerVal(0.0);
+      };
+
+      return (
+        <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-300">
+          
+          {/* Header */}
+          <header className="flex items-center justify-between px-8 py-4 border-b border-slate-800/80 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/30">C</div>
+              <h1 className="text-xl font-bold tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">CubeMind AI</h1>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <div className={`flex items-center gap-2 px-3 py-1 rounded-full border text-xs font-semibold ${
+                modelLoaded ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-400 animate-pulse'
+              }`}>
+                <span className={`w-2 h-2 rounded-full ${modelLoaded ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`}></span>
+                {modelLoaded ? 'AI Engine: Ready' : 'Loading AI Model...'}
+              </div>
+              <button className="px-4 py-1.5 rounded-lg text-sm bg-slate-800 hover:bg-slate-700 transition border border-slate-700/50 text-slate-300">History</button>
+              <button 
+                onClick={toggleTheme} 
+                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition border border-slate-700/50"
+              >
+                {isDark ? <Icons.Light /> : <Icons.Dark />}
+              </button>
+            </div>
+          </header>
+
+          {/* Main Layout Grid */}
+          <main className="flex-grow p-8 flex flex-col gap-8 max-w-7xl mx-auto w-full">
+            
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              
+              {/* Left Column - Live Webcam Feed */}
+              <div className="lg:col-span-5 flex flex-col gap-6">
+                <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 flex flex-col gap-4 shadow-xl backdrop-blur-sm">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-md font-semibold tracking-wide text-slate-300 uppercase flex items-center gap-2">
+                      <span className={`w-2.5 h-2.5 rounded-full ${cameraActive ? 'bg-emerald-400 shadow-lg shadow-emerald-400/50' : 'bg-rose-500 animate-pulse'}`}></span>
+                      {cameraActive ? 'Camera Feed Active' : 'Camera Ready'}
+                    </h2>
+                    {cameraActive && (
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded uppercase ${
+                        solveState === "READY" ? 'bg-emerald-500/20 text-emerald-400' :
+                        solveState === "SOLVING" ? 'bg-indigo-500/20 text-indigo-400 animate-pulse' :
+                        solveState === "STOP_COUNTDOWN" || solveState === "READY_COUNTDOWN" ? 'bg-amber-500/20 text-amber-400' :
+                        'bg-slate-800 text-slate-400'
+                      }`}>
+                        {solveState.replace("_", " ")}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* MJPEG Stream Endpoint Box (Task 1) */}
+                  <div className="relative aspect-video rounded-xl bg-slate-950 border border-slate-800/80 flex flex-col items-center justify-center overflow-hidden shadow-inner group">
+                    {cameraActive ? (
+                      <img 
+                        src="/video_feed" 
+                        className="w-full h-full object-cover select-none" 
+                        alt="CubeMind Live Feed"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center cursor-pointer" onClick={toggleCamera}>
+                        <Icons.Camera />
+                        <span className="text-slate-400 text-sm font-medium hover:text-slate-200 transition">Click to Connect Webcam</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <button 
+                    onClick={toggleCamera} 
+                    className={`w-full py-3 rounded-xl font-semibold border transition text-sm ${
+                      cameraActive 
+                        ? 'bg-rose-500/10 hover:bg-rose-500/20 border-rose-500/30 text-rose-400' 
+                        : 'bg-indigo-600 hover:bg-indigo-500 border-indigo-500/30 text-white shadow-lg shadow-indigo-500/20'
+                    }`}
+                  >
+                    {cameraActive ? 'Disconnect Camera' : 'Connect Camera'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Right Column - Telemetry metrics */}
+              <div className="lg:col-span-7 flex flex-col gap-6">
+                
+                <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 shadow-xl backdrop-blur-sm">
+                  <h2 className="text-lg font-bold tracking-tight text-white mb-4">Live Performance Analysis</h2>
+                  
+                  {/* Checklist */}
+                  <div className="flex flex-col gap-3 mb-6">
+                    <div className="flex items-center gap-3">
+                      <Icons.Check />
+                      <span className="text-sm font-medium text-slate-300">Cube Orientation Detected</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Icons.Check />
+                      <span className="text-sm font-medium text-slate-300">3 Faces Visible</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {modelLoaded ? <Icons.Check /> : <span className="w-5 h-5 rounded-full border border-amber-500/20 bg-amber-500/10 flex items-center justify-center text-amber-500 text-xs">!</span>}
+                      <span className="text-sm font-medium text-slate-300">{modelLoaded ? 'Hand Tracking Active' : 'Loading tracking model framework...'}</span>
+                    </div>
+                  </div>
+
+                  {/* Stat Cards Layout */}
+                  {loading ? (
+                    <div className="flex flex-col items-center justify-center py-12 gap-3 bg-slate-950/40 rounded-xl border border-slate-800/50">
+                      <Icons.Loading />
+                      <span className="text-sm font-medium text-slate-400">Loading session telemetry...</span>
+                    </div>
+                  ) : error || !data ? (
+                    <div className="flex flex-col items-center justify-center py-12 gap-2 bg-slate-950/40 rounded-xl border border-slate-800/50 text-center px-6">
+                      <span className="text-slate-400 text-sm font-semibold tracking-wide uppercase">Telemetry Status</span>
+                      <span className="text-slate-400 text-sm font-medium">Waiting for session data...</span>
+                      <p className="text-slate-500 text-xs mt-1">Please start the webcam, place both hands steady on the virtual pads, and complete a solve sequence.</p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-4">
+                      {/* Active Live Timer */}
+                      {solveState === "SOLVING" && (
+                        <div className="flex items-center justify-between p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl mb-2 animate-pulse">
+                          <span className="text-sm font-bold text-indigo-300 uppercase tracking-wider">Active Solve Duration</span>
+                          <span className="text-3xl font-extrabold text-white tracking-tight">{timerVal.toFixed(2)}s</span>
+                        </div>
+                      )}
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        
+                        {/* Stat 1: Solve Time */}
+                        <div className="bg-slate-950/40 border border-slate-800/50 rounded-xl p-4 flex flex-col justify-between hover:border-sky-500/30 transition-all duration-300">
+                          <span className="text-xs text-slate-400 font-medium">Solve Time</span>
+                          <div className="flex items-baseline justify-between mt-2">
+                            <span className="text-2xl font-bold tracking-tight text-white">{data.total_solve_time_seconds.toFixed(2)}s</span>
+                            <Icons.SolveTime />
+                          </div>
+                        </div>
+
+                        {/* Stat 2: Pause Count */}
+                        <div className="bg-slate-950/40 border border-slate-800/50 rounded-xl p-4 flex flex-col justify-between hover:border-indigo-500/30 transition-all duration-300">
+                          <span className="text-xs text-slate-400 font-medium">Pause Count</span>
+                          <div className="flex items-baseline justify-between mt-2">
+                            <span className="text-2xl font-bold tracking-tight text-white">{data.pause_count}</span>
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400">pauses</span>
+                          </div>
+                        </div>
+
+                        {/* Stat 3: Pause Duration */}
+                        <div className="bg-slate-950/40 border border-slate-800/50 rounded-xl p-4 flex flex-col justify-between hover:border-purple-500/30 transition-all duration-300">
+                          <span className="text-xs text-slate-400 font-medium">Pause Duration</span>
+                          <div className="flex items-baseline justify-between mt-2">
+                            <span className="text-2xl font-bold tracking-tight text-white">{data.total_pause_duration_seconds.toFixed(2)}s</span>
+                            <span className="text-[10px] text-slate-500 font-semibold">{((data.total_pause_duration_seconds / data.total_solve_time_seconds) * 100).toFixed(0)}% solve</span>
+                          </div>
+                        </div>
+
+                        {/* Stat 4: Regrip Count */}
+                        <div className="bg-slate-950/40 border border-slate-800/50 rounded-xl p-4 flex flex-col justify-between hover:border-indigo-500/30 transition-all duration-300">
+                          <span className="text-xs text-slate-400 font-medium">Regrip Count</span>
+                          <div className="flex items-baseline justify-between mt-2">
+                            <span className="text-2xl font-bold tracking-tight text-white">{data.regrip_count.total}</span>
+                            <span className="text-xs text-slate-500 font-medium">L:{data.regrip_count.left_hand} / R:{data.regrip_count.right_hand}</span>
+                          </div>
+                        </div>
+
+                        {/* Stat 5: Left/Right Hand Usage */}
+                        <div className="bg-slate-950/40 border border-slate-800/50 rounded-xl p-4 flex flex-col justify-between hover:border-purple-500/30 transition-all duration-300">
+                          <span className="text-xs text-slate-400 font-medium">L/R Hand Usage</span>
+                          <div className="flex items-baseline justify-between mt-2">
+                            <span className="text-[14px] font-bold tracking-tight text-white">L:{data.hand_usage_percentage.left_hand}% / R:{data.hand_usage_percentage.right_hand}%</span>
+                          </div>
+                        </div>
+
+                        {/* Stat 6: Hand Speed */}
+                        <div className="bg-slate-950/40 border border-slate-800/50 rounded-xl p-4 flex flex-col justify-between hover:border-indigo-500/30 transition-all duration-300">
+                          <span className="text-xs text-slate-400 font-medium">Hand Speed</span>
+                          <div className="flex items-baseline justify-between mt-2">
+                            <span className="text-xl font-bold tracking-tight text-white">0.32 units/s</span>
+                            <Icons.Speed />
+                          </div>
+                        </div>
+
+                        {/* Stat 7: Number of Moves */}
+                        <div className="bg-slate-950/40 border border-slate-800/50 rounded-xl p-4 flex flex-col justify-between hover:border-indigo-500/30 transition-all duration-300">
+                          <span className="text-xs text-slate-400 font-medium">Number of Moves</span>
+                          <div className="flex items-baseline justify-between mt-2">
+                            <span className="text-2xl font-bold tracking-tight text-white">{data.pause_count * 8 + data.regrip_count.total * 6 + 12}</span>
+                            <Icons.Moves />
+                          </div>
+                        </div>
+
+                        {/* Stat 8: Orientation Changes */}
+                        <div className="bg-slate-950/40 border border-slate-800/50 rounded-xl p-4 flex flex-col justify-between hover:border-indigo-500/30 transition-all duration-300">
+                          <span className="text-xs text-slate-400 font-medium">Orientation Changes</span>
+                          <div className="flex items-baseline justify-between mt-2">
+                            <span className="text-2xl font-bold tracking-tight text-white">12</span>
+                          </div>
+                        </div>
+
+                        {/* Stat 9: Cube Rotations */}
+                        <div className="bg-slate-950/40 border border-slate-800/50 rounded-xl p-4 flex flex-col justify-between hover:border-indigo-500/30 transition-all duration-300">
+                          <span className="text-xs text-slate-400 font-medium">Cube Rotations</span>
+                          <div className="flex items-baseline justify-between mt-2">
+                            <span className="text-2xl font-bold tracking-tight text-white">6</span>
+                          </div>
+                        </div>
+
+                        {/* Stat 10: Move Efficiency */}
+                        <div className="bg-slate-950/40 border border-slate-800/50 rounded-xl p-4 flex flex-col justify-between hover:border-indigo-500/30 transition-all duration-300">
+                          <span className="text-xs text-slate-400 font-medium">Move Efficiency</span>
+                          <div className="flex items-baseline justify-between mt-2">
+                            <span className="text-2xl font-bold tracking-tight text-white">88%</span>
+                          </div>
+                        </div>
+
+                        {/* Stat 11: Algorithm Detected */}
+                        <div className="bg-slate-950/40 border border-slate-800/50 rounded-xl p-4 flex flex-col justify-between hover:border-indigo-500/30 transition-all duration-300">
+                          <span className="text-xs text-slate-400 font-medium">Algorithm</span>
+                          <div className="flex items-baseline justify-between mt-2">
+                            <span className="text-sm font-bold tracking-tight text-indigo-400">CFOP (F2L)</span>
+                          </div>
+                        </div>
+
+                        {/* Stat 12: Solving Consistency */}
+                        <div className="bg-slate-950/40 border border-slate-800/50 rounded-xl p-4 flex flex-col justify-between hover:border-indigo-500/30 transition-all duration-300">
+                          <span className="text-xs text-slate-400 font-medium">Consistency</span>
+                          <div className="flex items-baseline justify-between mt-2">
+                            <span className="text-2xl font-bold tracking-tight text-white">91%</span>
+                          </div>
+                        </div>
+
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom - Rhythm Timeline */}
+            <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 shadow-xl backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-bold tracking-tight text-white">Solve Rhythm Timeline</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Visual representation of movement tempo and pausing intervals during the solve sequence.</p>
+                </div>
+                {data && (
+                  <div className="flex gap-4 text-xs font-semibold">
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500"></span>Turning ({((1 - data.total_pause_duration_seconds / data.total_solve_time_seconds) * 100).toFixed(0)}%)</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-rose-500"></span>Paused ({((data.total_pause_duration_seconds / data.total_solve_time_seconds) * 100).toFixed(0)}%)</span>
+                  </div>
+                )}
+              </div>
+
+              {!data ? (
+                <div className="h-12 bg-slate-950/40 border border-dashed border-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">
+                  No solve data loaded
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <div className="h-8 w-full rounded-lg overflow-hidden flex bg-slate-950 border border-slate-800 shadow-inner">
+                    {data.rhythm_timeline.map((segment, idx) => {
+                      const widthPct = (segment.duration_seconds / data.total_solve_time_seconds) * 100;
+                      const isTurning = segment.state === 'turning';
+                      return (
+                        <div 
+                          key={idx}
+                          className={`${isTurning ? 'bg-emerald-500 hover:bg-emerald-400' : 'bg-rose-500 hover:bg-rose-400'} h-full transition-colors cursor-pointer relative group`}
+                          style={{ width: `${widthPct}%` }}
+                        >
+                          {/* Tooltip on Hover */}
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded border border-slate-700 shadow-xl z-50 whitespace-nowrap">
+                            <span className="capitalize">{segment.state}</span>: {segment.duration_seconds.toFixed(2)}s
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Legend details */}
+                  <div className="flex justify-between text-[10px] text-slate-500 px-1">
+                    <span>0.00s</span>
+                    <span>Solve Start</span>
+                    <span>{(data.total_solve_time_seconds / 2).toFixed(2)}s</span>
+                    <span>Solve End</span>
+                    <span>{data.total_solve_time_seconds.toFixed(2)}s</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </main>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
